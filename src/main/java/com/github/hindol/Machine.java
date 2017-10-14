@@ -53,12 +53,10 @@ public class Machine<S, I> {
     public static class Builder<S, I> {
 
         private final Map<S, Map<I, S>> mTransitions = Maps.newHashMap();
+        private final Map<S, Set<S>> mInverseTransitions = Maps.newHashMap();
+        private final Set<S> mStates = Sets.newHashSet();
         private final Set<S> mTerminalStates = Sets.newHashSet();
-
-        public Builder<S, I> addState(S state) {
-            // Adding a state that is not part of any transition is symbolic. Do nothing.
-            return this;
-        }
+        private final Set<S> mValidStates = Sets.newHashSet();
 
         public Builder<S, I> addTerminalState(S state) {
             Preconditions.checkState(!mTerminalStates.contains(state));
@@ -74,14 +72,42 @@ public class Machine<S, I> {
 
             mTransitions.computeIfAbsent(current, s -> new HashMap<>());
 
+            // Throw on duplicate (state, input) pair.
             Preconditions.checkState(!mTransitions.get(current).containsKey(input));
             mTransitions.get(current).put(input, next);
+
+            mStates.add(current);
+            mStates.add(next);
+            mInverseTransitions.computeIfAbsent(next, s -> Sets.newHashSet()).add(current);
 
             return this;
         }
 
         public Machine<S, I> build(S initialState) {
             Preconditions.checkNotNull(initialState);
+
+            for (S terminalState : mTerminalStates) {
+                mValidStates.add(terminalState);
+
+                Queue<S> queue = new LinkedList<>();
+                queue.add(terminalState);
+
+                while (!queue.isEmpty()) {
+                    S head = queue.remove();
+                    if (mInverseTransitions.containsKey(head)) {
+                        for (S next : mInverseTransitions.get(head)) {
+                            if (!mValidStates.contains(next)) {
+                                mValidStates.add(next);
+                                queue.add(next);
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Checks for invalid states.
+            Preconditions.checkState(Sets.difference(mStates, mValidStates).isEmpty());
+
             return new Machine<>(initialState, mTerminalStates, mTransitions);
         }
     }
