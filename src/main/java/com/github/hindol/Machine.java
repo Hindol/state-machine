@@ -23,20 +23,24 @@ public class Machine<S, I> {
         mCurrentState = mInitialState;
     }
 
-    public Machine<S, I> process(I... inputs) {
+    public Machine<S, I> process(I... inputs) throws Exception {
         Preconditions.checkNotNull(inputs);
         return process(Arrays.asList(inputs));
     }
 
-    public Machine<S, I> process(List<I> inputs) {
+    public Machine<S, I> process(List<I> inputs) throws Exception {
         Preconditions.checkNotNull(inputs);
 
         for (I input : inputs) {
             Preconditions.checkNotNull(input);
             Preconditions.checkState(mTransitions.containsKey(mCurrentState));
-            Preconditions.checkNotNull(mTransitions.get(mCurrentState).get(input));
+            Preconditions.checkNotNull(mTransitions.get(mCurrentState).get(input),
+                    "Input %s @ state %s is not recognized!", input, mCurrentState);
 
             mCurrentState = mTransitions.get(mCurrentState).get(input);
+            Preconditions.checkState(
+                    mTransitions.containsKey(mCurrentState) || isTerminated(),
+                    "Reached an isolated non-terminal state %s!", mCurrentState);
         }
 
         return this;
@@ -59,7 +63,8 @@ public class Machine<S, I> {
         private final Set<S> mValidStates = Sets.newHashSet();
 
         public Builder<S, I> addTerminalState(S state) {
-            Preconditions.checkState(!mTerminalStates.contains(state));
+            Preconditions.checkState(!mTerminalStates.contains(state),
+                    "Duplicate terminal state %s!", state);
 
             mTerminalStates.add(state);
             return this;
@@ -73,7 +78,8 @@ public class Machine<S, I> {
             mTransitions.computeIfAbsent(current, s -> new HashMap<>());
 
             // Throw on duplicate (state, input) pair.
-            Preconditions.checkState(!mTransitions.get(current).containsKey(input));
+            Preconditions.checkState(!mTransitions.get(current).containsKey(input),
+                    "Duplicate transition {state=%s, input=%s}!", current, input);
             mTransitions.get(current).put(input, next);
 
             mStates.add(current);
@@ -156,8 +162,20 @@ public class Machine<S, I> {
                 .addTerminalState("COMPLETED")
                 .build("0S"); // Initial state
 
-        machine.reset();
-        machine.process("1R", "2R", "1R", "BUY");
-        System.out.println(machine.isTerminated());
+        try {
+            machine.reset();
+            machine.process("1R", "2R", "1R", "BUY");
+            System.out.println(machine.isTerminated());
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        try {
+            machine.reset();
+            machine.process("1R", "2R", "BUY");
+            System.out.println(machine.isTerminated());
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 }
