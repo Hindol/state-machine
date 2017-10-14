@@ -86,6 +86,31 @@ public class Machine<S, I> {
         public Machine<S, I> build(S initialState) {
             Preconditions.checkNotNull(initialState);
 
+            // Limit scope of queue
+            {
+                mValidStates.add(initialState);
+
+                Queue<S> queue = new LinkedList<>();
+                queue.add(initialState);
+
+                while (!queue.isEmpty()) {
+                    S head = queue.remove();
+                    if (mTransitions.containsKey(head)) {
+                        for (S next : mTransitions.get(head).values()) {
+                            if (!mValidStates.contains(next)) {
+                                mValidStates.add(next);
+                                queue.add(next);
+                            }
+                        }
+                    }
+                }
+
+                // Check for states that are not reachable from initial state.
+                Preconditions.checkState(Sets.difference(mStates, mValidStates).isEmpty());
+
+                mValidStates.clear();
+            }
+
             for (S terminalState : mTerminalStates) {
                 mValidStates.add(terminalState);
 
@@ -105,7 +130,7 @@ public class Machine<S, I> {
                 }
             }
 
-            // Checks for invalid states.
+            // Checks for states that have no way of reaching a terminal state.
             Preconditions.checkState(Sets.difference(mStates, mValidStates).isEmpty());
 
             return new Machine<>(initialState, mTerminalStates, mTransitions);

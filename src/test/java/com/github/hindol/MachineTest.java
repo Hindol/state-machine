@@ -63,5 +63,4 @@ public class MachineTest {
         machine.process("1R", "1R", "1R", "BUY");
         assertTrue(machine.isTerminated());
     }
-
 }
